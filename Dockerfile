@@ -84,7 +84,11 @@ RUN apt-get update \
 	unixodbc-dev \
 	unixodbc \
 	gfortran \
-	apt-utils 
+	apt-utils \
+# Mecab Install
+	mecab \
+	mecab-ipadic \
+	swig
 
 ##### Dockerコンテナのメジャーな問題である「The PID 1 Problem」を解決の為の処理  
 # RUN TINI_VERSION=`curl https://github.com/krallin/tini/releases3e/latest | grep -o "/v.*\"" | sed 's:^..\(.*\).$:\1:'` && \  
@@ -159,8 +163,9 @@ RUN pip install --no-cache-dir \
     shap \
     umap \
     xgboost \
-    lightgbm
-
+    lightgbm \
+# Mecab Install
+	mecab-python3
 ##### データベース接続ライブラリの組み込み  
 ##### DBドライバーインストール  
 ##### cx_Oracle SQLAlchemy pyodbc  
