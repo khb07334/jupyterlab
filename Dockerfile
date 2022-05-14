@@ -37,7 +37,7 @@
 
 ###############################################
 ##### https://www.idnet.co.jp/column/page_187.html
-FROM python:3.9.7-buster
+FROM python:3.9.7-slim-buster
 ARG DEBIAN_FRONTEND=noninteractive
 ##### パッケージの追加とタイムゾーンの設定
 ##### 必要に応じてインストールするパッケージを追加してください
@@ -204,17 +204,24 @@ RUN python3 -m pip install \
 
 #--------- conda -------------------------------------  
 ##### Anaconda インストール From pythonの場合
-RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh \  
-#    && wget --quiet https://repo.continuum.io/archive/Anaconda3-2020.02-Linux-x86_64.sh -O ~/anaconda.sh  
-   && wget -c --quiet https://repo.continuum.io/archive/Anaconda3-2021.05-Linux-x86_64.sh -O ~/anaconda.sh   
-RUN /bin/bash ~/anaconda.sh -u -b -p /opt/conda \  
-# RUN sh ~/anaconda.sh -b -p /opt/conda \  
-   && rm ~/anaconda.sh  
-
-RUN echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \  
-    && echo "conda activate base" >> ~/.bashrc  
-
+#RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh \  
+##    && wget --quiet https://repo.continuum.io/archive/Anaconda3-2020.02-Linux-x86_64.sh -O ~/anaconda.sh  
+#   && wget -c --quiet https://repo.continuum.io/archive/Anaconda3-2021.05-Linux-x86_64.sh -O ~/anaconda.sh   
+#RUN /bin/bash ~/anaconda.sh -u -b -p /opt/conda \  
+## RUN sh ~/anaconda.sh -b -p /opt/conda \  
+#   && rm ~/anaconda.sh  
+#
+#RUN echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \  
+#    && echo "conda activate base" >> ~/.bashrc  
+#
+#--------- Miniconda ------------------------------------- 
+WORKDIR /opt
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh \
+ && sh /opt/Miniconda3-4.5.4-Linux-x86_64.sh -b -p /opt/miniconda3 \
+ && rm -f Miniconda3-4.5.4-Linux-x86_64.sh 
+ENV PATH=/opt/miniconda3/bin:$PATH
 ##### conda create & Update
+RUN conda install conda=4.8.3=py36_0
 RUN conda create -n GSC_Edu_model python==3.7
 RUN conda update -c default conda
 
@@ -309,6 +316,7 @@ RUN jupyter contrib nbextension install --user \
 ##### 環境再現のためのリストを出力  
 #   https://qiita.com/WestRiver/items/cce9c99076d59abd3f69  
 RUN conda list --export > conda_package_list.txt  
+WORKDIR /root
 
 ##### Jupyter Notebookの起動  
 #CMD jupyter-lab --no-browser \ 
