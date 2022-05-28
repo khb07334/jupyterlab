@@ -37,7 +37,8 @@
 
 ###############################################
 ##### https://www.idnet.co.jp/column/page_187.html
-FROM python:3.9.7-slim-buster
+# FROM python:3.9.7-slim-buster
+FROM python:3.4.10-slim
 ARG DEBIAN_FRONTEND=noninteractive
 ##### パッケージの追加とタイムゾーンの設定
 ##### 必要に応じてインストールするパッケージを追加してください
@@ -53,16 +54,16 @@ ENV TZ=Asia/Tokyo
 # SHELL ["/bin/bash", "-l", "-c"]  
 # ENV TZ=Asia/Tokyo
 ENV LANG=ja_JP.UTF-8 LC_ALL=C.UTF-8  
-ENV ORACLE_HOME=/opt/oracle  
+ENV ORACLE_HOME=/opt/oracle
 ENV LD_RUN_PATH=$ORACLE_HOME  
-ENV LD_LIBRARY_PATH=$ORACLE_HOME:$ORACLE_HOME/lib  
+ENV LD_LIBRARY_PATH=$ORACLE_HOME:$ORACLE_HOME/lib:$ORACLE_HOME/lib/oracle/21.1/lib/${LD_LIBRARY_PATH:+${LD_RUN_PATH}}
 ENV PATH /opt/conda/bin:/opt/conda/bin::/opt/mssql-tools/bin:$PATH:$ORACLE_HOME  
 ENV GRANT_SUDO=yes  
 
 # USER root 
 
-RUN apt-get update \
- && apt-get -y install \
+RUN apt-get update
+RUN ACCEPT_EULA=Y apt-get -y install \
 	wget \
 	bzip2 \
 	unzip \
@@ -73,22 +74,21 @@ RUN apt-get update \
 	make \
 	gcc \
 	g++ \
-	dpkg \  
    	ca-certificates \
+	apt-transport-https \
+	gnupg2 \
 	git \
 	mercurial \
 	subversion \
 	tk-dev \
 	openssl \
-	libffi-dev \  
+	libffi-dev \
+#	libaio1 \
 	unixodbc-dev \
 	unixodbc \
 	gfortran \
-	apt-utils \
-# Mecab Install
-	mecab \
-	mecab-ipadic \
-	swig
+	sudo \
+	apt-utils 
 
 ##### Dockerコンテナのメジャーな問題である「The PID 1 Problem」を解決の為の処理  
 # RUN TINI_VERSION=`curl https://github.com/krallin/tini/releases3e/latest | grep -o "/v.*\"" | sed 's:^..\(.*\).$:\1:'` && \  
@@ -98,148 +98,89 @@ RUN apt-get update \
 #     rm tini  
 
 ##### 日本語フォントの組み込み  
-RUN apt-get update \  
+# RUN apt-get update \  
 #    && apt-get install -y --no-install-recommends fonts-takao-gothic \  
-    && apt-get install -y fonts-takao-gothic \  
+RUN ACCEPT_EULA=Y apt-get install -y fonts-takao-gothic \  
     && apt-get clean \  
     && rm -rf /var/lib/apt/lists/   
-
 #RUN echo -e "\nfont.family: TakaoPGothic" >> $(python -c 'import matplotlib as m; print(m.matplotlib_fname())') \  
 #    && rm -f ~/.cache/matplotlib/font*  
 
 ##### -----Build start!! ------  
 ##### データベース接続ライブラリの組み込み  
 ##### DBドライバーインストール  
+##### cx_Oracle SQLAlchemy pyodbc  
+#RUN wget --quiet https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basiclite-linux.x64-21.1.0.0.0.zip   
+RUN wget --quiet https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0.zip  
+RUN unzip instantclient-*.zip   
+
+RUN ls -al && cd instantclient_* && pwd  
+RUN mkdir -p $ORACLE_HOME \  
+    && mv instantclient_21_1 $ORACLE_HOME/lib \  
+    && rm -f /instantclient-*.zip
+
 ##### MSSQL DB  
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -  
-# --proxy http://10432252:3ekibata04@obprx02.intra.hitachi.co.jp:8080 | apt-key add -  
+# --proxy http://10432252:xxxxxxxx@obprx02.intra.hitachi.co.jp:8080 | apt-key add -  
 
 ##### Download appropriate package for the OS version  
 ##### Choose only ONE of the following, corresponding to your OS version  
 
 ##### Ubuntu20.04  
-RUN curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > /etc/apt/sources.list.d/mssql-release.list  
+# RUN curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > /etc/apt/sources.list.d/mssql-release.list  
+# RUN cat /etc/apt/sources.list.d/mssql-release.list
+## RUN add-apt-repository "$(curl https://packages.microsoft.com/ubuntu/20.04/prod.list)"
 
 ##### Debian 8  
-# curl https://packages.microsoft.com/config/debian/8/prod.list > /etc/apt/sources.list.d/mssql-release.list  
+# RUN curl https://packages.microsoft.com/config/debian/8/prod.list > /etc/apt/sources.list.d/mssql-release.list  
 
 ##### Debian 9  
-# curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list  
+# RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list  
 
 ##### Debian 10  
-# RUN curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list  
+RUN curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list  
 
 #####
-RUN apt-get update && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql17  
+RUN apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql17 libaio1
 RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile \  
     && echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc  
 
-#---------- pip ---------------------------------------  
-
-##### Pythonのパッケージ管理システムpipのインストール  
-
-WORKDIR /workspace  
-
-# RUN wget https://bootstrap.pypa.io/get-pip.py \  
-#     && python get-pip.py pip --user \  
-#     # && python get-pip.py pip --user --proxy="http://10432252:3ekibata04@obprx02.intra.hitachi.co.jp:8080" \  
-#     && python -m pip install -U pip  
-
-RUN python3 -m pip install --upgrade pip \
-&&  pip install --no-cache-dir \
-    black \
-    jupyterlab \
-    jupyterlab_code_formatter \
-    jupyterlab-git \
-    lckr-jupyterlab-variableinspector \
-    jupyterlab_widgets \
-    ipywidgets \
-    import-ipynb
-# 追加パッケージ（必要に応じて）各環境に特化したパッケージがある場合、この部分に追加します
-RUN pip install --no-cache-dir \
-    pydeps \
-    graphviz \
-    pandas_profiling \
-    shap \
-    umap \
-    xgboost \
-    lightgbm \
-# Mecab Install
-	mecab-python3
-##### データベース接続ライブラリの組み込み  
-##### DBドライバーインストール  
-##### cx_Oracle SQLAlchemy pyodbc  
-RUN wget --quiet https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basiclite-linux.x64-21.1.0.0.0.zip   
-#RUN wget --quiet https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0.zip  
-RUN unzip instantclient-*.zip   
-RUN ls -al && cd instantclient_* && pwd  
-RUN mkdir -p $ORACLE_HOME \  
-    && mv instantclient_21_1 $ORACLE_HOME/lib \  
-    && rm -f /instantclient-*.zip  
-
-#RUN python3 -m pip install cx_Oracle SQLAlchemy pyodbc --user  
-RUN python3 -m pip install cx_Oracle SQLAlchemy  --user  
-
-#会社環境だと上記ではうまくいかなかいので先にDLしてから組込む  
-#● COPY dbdriver/* /workspace/  
-
-###### 描画&数値ライブラリの組み込み  (debian だとpip install がうまく動かない  
-# RUN apt-get update --fix-missing && apt-get install -y graphviz \  
-RUN python3 -m pip install \
-	dtreeviz \
-	japanize-matplotlib \
-	changefinder \
-	pyper \
-	arch \
-#	six --user
-
-##### variableinspector インストール -----  
-# RUN pip install lckr-jupyterlab-variableinspector  
-	lckr-jupyterlab-variableinspector \
-
-##### NeuralProphet インストール -----  
-# NeuralProphetのインストール  
-# RUN pip install neuralprophet  
-	neuralprophet \
-
-##### streamlitのインストール  
-# Port8501解放要
-# RUN pip install streamlit  
-	streamlit  
-
 #--------- conda -------------------------------------  
 ##### Anaconda インストール From pythonの場合
-#RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh \  
-##    && wget --quiet https://repo.continuum.io/archive/Anaconda3-2020.02-Linux-x86_64.sh -O ~/anaconda.sh  
-#   && wget -c --quiet https://repo.continuum.io/archive/Anaconda3-2021.05-Linux-x86_64.sh -O ~/anaconda.sh   
-#RUN /bin/bash ~/anaconda.sh -u -b -p /opt/conda \  
-## RUN sh ~/anaconda.sh -b -p /opt/conda \  
-#   && rm ~/anaconda.sh  
-#
-#RUN echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \  
-#    && echo "conda activate base" >> ~/.bashrc  
-#
-#--------- Miniconda ------------------------------------- 
 WORKDIR /opt
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh \
- && sh /opt/Miniconda3-4.5.4-Linux-x86_64.sh -b -p /opt/miniconda3 \
- && rm -f Miniconda3-4.5.4-Linux-x86_64.sh 
-ENV PATH=/opt/miniconda3/bin:$PATH
-##### conda create & Update
-RUN conda install conda=4.8.3=py36_0
-RUN conda create -n GSC_Edu_model python==3.7
-RUN conda update -c default conda
+RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh \  
+#    && wget --quiet https://repo.continuum.io/archive/Anaconda3-2020.02-Linux-x86_64.sh -O ~/anaconda.sh  
+   && wget -c --quiet https://repo.continuum.io/archive/Anaconda3-2021.05-Linux-x86_64.sh -O ~/anaconda.sh   
+RUN /bin/bash ~/anaconda.sh -u -b -p /opt/conda \  
+# RUN sh ~/anaconda.sh -b -p /opt/conda \  
+   && rm ~/anaconda.sh  
 
-##### 仮想環境"GSC_Edu_model"にインストール開始
-SHELL ["conda", "run", "-n", "GSC_Edu_model", "/bin/bash", "-c"] 
+RUN echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \  
+    && echo "conda activate base" >> ~/.bashrc  
+
+#--------- Miniconda ------------------------------------- 
+#WORKDIR /opt
+#RUN wget https://repo.anaconda.com/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh \
+# && sh /opt/Miniconda3-4.5.4-Linux-x86_64.sh -b -p /opt/miniconda3 \
+# && rm -f Miniconda3-4.5.4-Linux-x86_64.sh 
+#ENV PATH=/opt/miniconda3/bin:$PATH
+
+##### conda create & Update
+#RUN conda install conda=4.8.3=py36_0 (Miniconda)
+RUN conda install conda=4.8.3
+RUN conda create -n GSC python==3.7 && activate GSC
+RUN conda update -c defaults conda
+
+##### 仮想環境"GSC"にインストール開始
+# SHELL ["conda", "run", "-n", "GSC", "/bin/bash", "-c"] 
 
 ##### jupyterExtension導入の下準備  
 RUN conda config --append channels conda-forge
 RUN conda config --get channels
 
 ##### nodejsのインストール  
-RUN conda install -c conda-forge nodejs==12.1.0
-#RUN conda install -c conda-forge nodejs && node -v
+#RUN conda install -c conda-forge nodejs==12.1.0 (Miniconda)
+RUN conda install -c conda-forge nodejs && node -v
 
 ##### 標準ライブラリの組み込み  
 RUN conda install -c conda-forge \
@@ -254,21 +195,25 @@ RUN conda install -c conda-forge \
     beautifulsoup4 \
     Pillow \
 	cython \
-plotly
-
-#RUN conda install -c conda-forge \
-#    opencv-python
+	plotly \
 #    pycaret \
-#    japanize_matplotlib 
+&& conda clean --all -f -y  
 
+##### Jupyterlab組み込み
+# RUN jupyter serverextension enable --py jupyterlab --sys-prefix  #JupyterNote?バージョンが5.3より低いとき必要
+RUN conda install -c conda-forge jupyterlab
 
 ##### 拡張ライブラリの組み込み(-c conda-forge)
 RUN conda install -c conda-forge \
-jupyter_contrib_nbextensions \
-python-graphviz \
-pydotplus \
-ipywidgets \
-&& conda clean --all -f -y  
+	jupyter_contrib_nbextensions 
+#RUN conda install -c conda-forge \
+#	python-graphviz 
+RUN conda install -c conda-forge \
+	pydotplus 
+RUN conda install -c conda-forge \
+	ipywidgets
+# opencv-python　\
+RUN conda clean --all -f -y  
 
 ##### PyTorchのインストール(-c conda-forge)
 # RUN conda install -c conda-forge \
@@ -280,12 +225,11 @@ ipywidgets \
 RUN conda install -c anaconda ephem
 RUN conda install -c conda-forge pystan fbprophet
 
+# RUN conda install -c uehara1414 japanize_matplotlib
 #-------------------------------------------------  
 ##### jupyterlab拡張機能  
+
 # SHELL ["/bin/bash", "-l", "-c"]  
-
-# RUN jupyter serverextension enable --py jupyterlab --sys-prefix  
-
 ##### nbextensions インストール  
 RUN jupyter contrib nbextension install --user \  
    && jupyter nbextensions_configurator enable --user  
@@ -307,8 +251,111 @@ RUN jupyter contrib nbextension install --user \
 ##### jupyterlab-nvdashboard  
 # RUN jupyter labextension install jupyterlab-nvdashboard  
 
+#  #---------- pip ---------------------------------------  
+#  
+#  ##### Pythonのパッケージ管理システムpipのインストール  
+#  
+#  WORKDIR /workspace  
+#  
+#  # RUN wget https://bootstrap.pypa.io/get-pip.py \  
+#  #     && python get-pip.py pip --user \  
+#  #     # && python get-pip.py pip --user --proxy="http://10432252:3ekibata04@obprx02.intra.hitachi.co.jp:8080" \  
+#  #     && python -m pip install -U pip  
+#  
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install  --no-cache-dir \
+	  ipykernel \
+&& ipython kernel install --user --name=GSC
+RUN python3 -m pip install  --no-cache-dir \
+      jupyterlab_code_formatter \
+      jupyterlab-git 
+RUN python3 -m pip install  --no-cache-dir \
+      lckr-jupyterlab-variableinspector
+#      jupyterlab_widgets \
+#  #    ipywidgets \
+#     import-ipynb \
+#  # 追加パッケージ（必要に応じて）各環境に特化したパッケージがある場合、この部分に追加します
+#  RUN pip install --no-cache-dir \
+#      pydeps \
+RUN python3 -m pip install  --no-cache-dir \
+      graphviz \ 
+	  japanize-matplotlib
+#      pandas_profiling \
+#      shap \
+#      umap \
+RUN python3 -m pip install  --no-cache-dir \
+      xgboost 
+#      lightgbm \
+#	-- user
+
+
+RUN python3 -m pip install cx_Oracle SQLAlchemy pyodbc --user  
+#RUN python3 -m pip install cx_Oracle SQLAlchemy  --user  
+
+#会社環境だと上記ではうまくいかなかいので先にDLしてから組込む  
+#● COPY dbdriver/* /workspace/  
+
+###### 描画&数値ライブラリの組み込み  (debian だとpip install がうまく動かない  
+# RUN apt-get update --fix-missing && apt-get install -y graphviz \  
+RUN python3 -m pip install \
+  	dtreeviz \
+#  	japanize-matplotlib \
+#  	changefinder \
+#  	pyper \
+#  	arch \
+# 	six \
+	--user
+
+##### NeuralProphet インストール -----  
+## NeuralProphetのインストール  
+## RUN pip install neuralprophet  
+#	neuralprophet \
+###### streamlitのインストール  
+## Port8501解放要
+#RUN python3 -m pip install \  
+#  	streamlit  \
+#	-- user
 
 #--------------------------------------------------------
+# mecabの導入(apt)
+ RUN ACCEPT_EULA=Y apt-get -y update && \
+	apt-get install -y \
+	mecab \
+#	mecab-ipadic \
+  	mecab-ipadic-utf8 \
+  	libmecab-dev \
+  	swig \
+  	xz-utils \
+  	file \
+	sudo
+# Mecab Install(pip)
+#RUN pip install --no-cache-dir \
+RUN pip install	mecab-python3==0.996.5
+RUN pip install	unidic-lite
+#RUN mecab -D
+#RUN mkdir workdir
+#WORKDIR /workdir
+#COPY container/ /workdir
+
+#mecabの導入(Conda)
+#RUN conda install -c mzh mecab-python3
+#RUN conda install mecab-python3
+
+# mecab-ipadic-NEologdのインストール
+RUN git clone --depth 1 https://github.com/neologd/mecab-ipadic-neologd.git && \
+  cd mecab-ipadic-neologd && \
+  ./bin/install-mecab-ipadic-neologd -n -y && \
+  echo dicdir = `mecab-config --dicdir`"/mecab-ipadic-neologd">/etc/mecabrc && \
+  sudo cp /etc/mecabrc /usr/local/etc && \
+  cd
+#----------------------------------------
+# ENV TZ Asia/Tokyo
+ENV LANG ja_JP.UTF-8
+ENV LANGUAGE ja_JP:ja
+#ENV LC_ALL ja_JP.UTF-8
+
+#RUN pip install --upgrade pip --no-cache-dir && \
+#  pip install -r requirements.txt --no-cache-dir
 
 ##### Jupyter Notebookの起動 ------  
 #  CMDは一度しか使えないのでコマンドを複数実行させる場合は下記のように  
@@ -327,5 +374,3 @@ WORKDIR /root
 #CMD jupyter-lab --no-browser \ 
 #    --port=8888 --ip=0.0.0.0 --allow-root \ 
 #    --NotebookApp.token=''  
-
-
