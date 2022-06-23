@@ -267,7 +267,8 @@ RUN python3 -m pip install  --no-cache-dir \
 	  ipykernel \
 && ipython kernel install --user --name=GSC
 RUN python3 -m pip install  --no-cache-dir \
-      jupyterlab_code_formatter \
+      openpyxl xlrd \
+	  jupyterlab_code_formatter \
       jupyterlab-git 
 RUN python3 -m pip install  --no-cache-dir \
       lckr-jupyterlab-variableinspector
@@ -332,6 +333,7 @@ RUN python3 -m pip install \
 #RUN pip install --no-cache-dir \
 RUN pip install	mecab-python3==0.996.5
 RUN pip install	unidic-lite
+RUN pip install wordcloud janome gensim
 #RUN mecab -D
 #RUN mkdir workdir
 #WORKDIR /workdir
@@ -342,12 +344,12 @@ RUN pip install	unidic-lite
 #RUN conda install mecab-python3
 
 # mecab-ipadic-NEologdのインストール
-RUN git clone --depth 1 https://github.com/neologd/mecab-ipadic-neologd.git && \
-  cd mecab-ipadic-neologd && \
-  ./bin/install-mecab-ipadic-neologd -n -y && \
-  echo dicdir = `mecab-config --dicdir`"/mecab-ipadic-neologd">/etc/mecabrc && \
-  sudo cp /etc/mecabrc /usr/local/etc && \
-  cd
+#RUN git clone --depth 1 https://github.com/neologd/mecab-ipadic-neologd.git && \
+#  cd mecab-ipadic-neologd && \
+#  ./bin/install-mecab-ipadic-neologd -n -y && \
+#  echo dicdir = `mecab-config --dicdir`"/mecab-ipadic-neologd">/etc/mecabrc && \
+#  sudo cp /etc/mecabrc /usr/local/etc && \
+#  cd
 #----------------------------------------
 # ENV TZ Asia/Tokyo
 ENV LANG ja_JP.UTF-8
