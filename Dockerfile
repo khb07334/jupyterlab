@@ -167,9 +167,10 @@ RUN echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \
 
 ##### conda create & Update
 #RUN conda install conda=4.8.3=py36_0 (Miniconda)
-RUN conda install conda=4.8.3
+#RUN conda install conda=4.8.3
 RUN conda create -n GSC python==3.7 && activate GSC
 RUN conda update -c defaults conda
+RUN conda install -c conda-forge jupyter
 
 ##### 仮想環境"GSC"にインストール開始
 # SHELL ["conda", "run", "-n", "GSC", "/bin/bash", "-c"] 
@@ -201,7 +202,7 @@ RUN conda install -c conda-forge \
 
 ##### Jupyterlab組み込み
 # RUN jupyter serverextension enable --py jupyterlab --sys-prefix  #JupyterNote?バージョンが5.3より低いとき必要
-RUN conda install -c conda-forge jupyterlab
+# RUN conda install -c conda-forge jupyterlab
 
 ##### 拡張ライブラリの組み込み(-c conda-forge)
 RUN conda install -c conda-forge \
@@ -224,6 +225,10 @@ RUN conda clean --all -f -y
 ##### fbprophet及び依存関係のインストール  
 RUN conda install -c anaconda ephem
 RUN conda install -c conda-forge pystan fbprophet
+
+##### Word2vec関連及び依存関係のインストール  
+# RUN conda install -c conda-forge janome
+# RUN conda install -c conda-forge gensim
 
 # RUN conda install -c uehara1414 japanize_matplotlib
 #-------------------------------------------------  
@@ -333,7 +338,12 @@ RUN python3 -m pip install \
 #RUN pip install --no-cache-dir \
 RUN pip install	mecab-python3==0.996.5
 RUN pip install	unidic-lite
-RUN pip install wordcloud janome gensim
+RUN pip install wordcloud
+
+##### Word2vec関連及び依存関係のインストール  
+RUN pip install janome
+RUN pip install --upgrade gensim
+
 #RUN mecab -D
 #RUN mkdir workdir
 #WORKDIR /workdir
